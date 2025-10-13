@@ -26,9 +26,9 @@ bss_clear_loop:
 bss_clear_done:
         ret
 
-# 在同一个文件中定义栈空间
+# 定义栈空间
 .section .bss
 .align 16        # 16字节对齐，满足RISC-V ABI要求
 stack0:
-        .skip 4096 * 4    # 分配4KB栈空间
+        .skip 4096 * 4    # 分配16KB栈空间
 stack_top:                 # 栈顶标签，便于直接引用

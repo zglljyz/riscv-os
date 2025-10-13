@@ -44,4 +44,11 @@ SECTIONS
 
     /* 内核结束位置符号 */
     PROVIDE(end = .);
+    
+    PROVIDE(PHYSTOP = 0x80000000 + 128 * 1024 * 1024);
 }
+
+
+
+
+

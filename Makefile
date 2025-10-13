@@ -12,7 +12,7 @@ LD = $(TOOLPREFIX)ld
 # -g: 生成调试信息
 # -Wall: 开启所有警告
 # -Ikernel/: 允许 #include "..." 时在 kernel/ 目录中查找文件
-CFLAGS = -mcmodel=medany -ffreestanding -nostdlib -g -Wall -Ikernel/
+CFLAGS = -mcmodel=medany -ffreestanding -nostdlib -g -Wall -Ikernel/ -Iinclude/
 
 # 链接器参数，-T 指定使用我们的链接脚本
 LDFLAGS = -T scripts/kernel.ld
@@ -23,7 +23,10 @@ OBJS = \
   kernel/boot/entry.o \
   kernel/main.o \
   kernel/uart.o \
-  kernel/printf.o
+  kernel/printf.o \
+  kernel/string.o \
+  kernel/mm/pmm.o \
+  kernel/mm/vm.o
 
 # 定义最终生成的可执行内核文件名
 TARGET = kernel.elf

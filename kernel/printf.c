@@ -1,7 +1,7 @@
 
 
 #include <stdarg.h>
-
+#include "types.h" 
 // 调用 uart.c 中的函数，在此声明它们。
 void uart_putc(char c);
 void uart_puts(char *s);
@@ -25,7 +25,7 @@ static void print_number(long long num, int base, int is_signed)
     unsigned long long n; // 使用无符号类型来处理数字，简化逻辑
 
     // --- 步骤1: 处理符号，并将数字转换为正数 ---
-    // 如果是有符号打印，且数字为负，我们记录下这个事实，
+    // 如果是有符号打印，且数字为负，记录
     // 然后将数字转换为其正数形式。
     // 之后的所有转换逻辑都只需要处理正数。
     int sign = 0;
@@ -59,69 +59,95 @@ static void print_number(long long num, int base, int is_signed)
 }
 
 
-void printf(const char *fmt, ...)
+/**
+ * @brief 核心的格式化输出函数，接收 va_list。
+ *        这是所有printf类函数的底层实现。
+ * @param fmt 格式字符串
+ * @param ap  可变参数列表指针
+ */
+static void vprintf(const char *fmt, va_list ap)
 {
-    va_list ap; // 定义一个指向可变参数列表的指针
-    va_start(ap, fmt); // 初始化 ap，使其指向第一个可变参数
-
     const char *p = fmt;
+    int is_long = 0; // 标志位，用于判断是否有 'l' 修饰符 (64位)
+
+    // 遍历整个格式字符串
     while (*p) {
         if (*p != '%') {
-            // 如果不是格式说明符，直接打印字符
             uart_putc(*p);
-        } else {
-            // 跳过 '%'
             p++;
-            // 根据 '%' 后面的字符进行处理
-            switch (*p) {
-                case 'd': { // 十进制整数
-                    int i = va_arg(ap, int);
-                    print_number(i, 10, 1);
-                    break;
+            continue; // 继续下一个字符
+        }
+
+        p++; // 跳过 '%'
+
+        // 检查是否有 'l' 修饰符，用于支持 %ld 和 %lx
+        if (*p == 'l') {
+            is_long = 1;
+            p++;
+        }
+
+        // 根据格式说明符进行处理
+        switch (*p) {
+            case 'd': { // 十进制整数
+                // 使用三元运算符根据is_long标志决定取出的参数类型
+                long long val = is_long ? va_arg(ap, long long) : va_arg(ap, int);
+                print_number(val, 10, 1);
+                break;
+            }
+            case 'x': { // 十六进制整数
+                unsigned long long val = is_long ? va_arg(ap, unsigned long long) : va_arg(ap, unsigned int);
+                print_number(val, 16, 0);
+                break;
+            }
+            case 'p': { // 指针地址 (按64位十六进制处理)
+                // 指针总是64位的，所以直接取出 unsigned long long
+                unsigned long long val = va_arg(ap, unsigned long long);
+                uart_puts("0x");
+                print_number(val, 16, 0);
+                break;
+            }
+            case 's': { // 字符串
+                char *s = va_arg(ap, char *);
+                if (s == NULL) { // 边界情况：处理空指针
+                    uart_puts("(null)");
+                } else {
+                    uart_puts(s);
                 }
-                case 'x': { // 十六进制整数
-                    int i = va_arg(ap, int);
-                    print_number(i, 16, 0);
-                    break;
-                }
-                case 'p': { // 指针
-                    // 指针在64位架构下是64位长，用 long long 来接收
-                    unsigned long long i = va_arg(ap, unsigned long long);
-                    uart_puts("0x");
-                    print_number(i, 16, 0);
-                    break;
-                }
-                case 's': { // 字符串
-                    char *s = va_arg(ap, char *);
-                    if (s == 0) { // 处理空指针的边界情况
-                        uart_puts("(null)");
-                    } else {
-                        uart_puts(s);
-                    }
-                    break;
-                }
-                case 'c': { // 字符
-                    // char 类型在作为可变参数传递时会被提升为 int
-                    char c = va_arg(ap, int);
-                    uart_putc(c);
-                    break;
-                }
-                case '%': { // 打印一个 '%'
-                    uart_putc('%');
-                    break;
-                }
-                default: { // 未知格式符
-                    // 遵从我们的设计决策：原样打印
-                    uart_putc('%');
-                    uart_putc(*p);
-                    break;
-                }
+                break;
+            }
+            case 'c': { // 单个字符
+                // char 会被自动提升为 int
+                char c = va_arg(ap, int);
+                uart_putc(c);
+                break;
+            }
+            case '%': { // 打印百分号本身
+                uart_putc('%');
+                break;
+            }
+            default: { // 未知的格式说明符
+                // 原样打印，以便调试
+                uart_putc('%');
+                uart_putc(*p);
+                break;
             }
         }
-        p++; // 处理下一个字符
-    }
 
-    va_end(ap); // 清理可变参数列表
+        is_long = 0; // 处理完一个格式符后，重置标志位
+        p++;         // 指向下一个字符
+    }
+}
+
+/**
+ * @brief 公共的 printf 接口函数。
+ *        它是一个简单的封装，负责初始化va_list并调用vprintf。
+ */
+void printf(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
 }
 
 /**
